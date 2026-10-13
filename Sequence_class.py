@@ -809,7 +809,13 @@ Even while outputing a .csv, this method will still output the dictionary contai
         return clinvar_result
     
     def mes_canonical_analysis(self, genomic_coordinates = None, chromosome = None, strand = None, species = "human", coordinates = None, start_cdna = None, end_cdna = None, file_output=None, file_name=None):
-        
+        """This method performs a MaxEntScan analysis on the exons within inputed exonic coorddinates. 
+The analysis returns the percentage of variation in the splicing strength of the Acceptor and Donnor regions of each exon, for any posible SNP variant.
+
+The user may choose the output to be a .csv by setting the parameter file_output='csv'. The file will be created in the local directory
+Setting the output to a .csv is recomended, as longer intervals will create huge outputs, which are difficult to read in the terminal
+Even while outputing a .csv, this method will still output the dictionary containing the result (which can be stored as a variable for further use or printed in the terminal as well).
+"""
         csv_output = False #The program checks if the user wants a csv output
         if file_output is not None:
             
@@ -885,15 +891,15 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
         if start_cdna < 0: #There must be a 5'UTR
             accumulated_five_length = 0
             for i in range(0, genomic_max_index + 1): 
-                accumulated_five_length += genomic_coordinates["end"][i] - genomic_coordinates["start"][i] + 1
-                if accumulated_five_length < -start_cdna: 
+                accumulated_five_length += genomic_coordinates["end"][i] - genomic_coordinates["start"][i] + 1 #first exon length is accumulated
+                if accumulated_five_length < -start_cdna: #If accumulation is smaller than the size of 5'UTR, there must be more exons inside 5'UTR
                     continue
                 else:
                     last_five_exon = i + current_exon - 1 #This will be the last exon presenting 5'UTR
         else:
             last_five_exon = 0 #This will always be smaller than any current_exon
                 
-        if type(end_cdna) is str:
+        if type(end_cdna) is str: #If end_cdna is a string, its nomenclature must be *(number) and thus, there is 3'UTR
             if match := re.search(r"^\*(\d+)", end_cdna):
                 three_utr_length = int(match.group(1))
                 accumulated_three_length = 0
@@ -906,6 +912,7 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
         else:
             first_three_exon = current_exon + genomic_max_index + 2 #This will always be bigger than any current_exon
         
+        #This variables will contain the starting and ending points of acceptors and donnors, distributed like [A,D,A,D...]
         new_start_list = []
         new_end_list= []
 
@@ -922,18 +929,19 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
                 new_start_list.append(start_coord - 6)
                 new_end_list.append(start_coord + 2)
             
-        new_genomic_coordinates = {"start": new_start_list, "end": new_end_list}
+        new_genomic_coordinates = {"start": new_start_list, "end": new_end_list} #The lists are merged into a dictionary suitable for get_sequence()
+        #The program will obtained a concatenated sequence of acceptors and donnors of all the exons present in the interval
         concatenated_sequence = get_sequence(new_genomic_coordinates, chromosome, strand, flank, include_introns, species)
         sequence_position = 0
-        mes_result = {}
+        mes_result = {} #This variable will store the result
         nts = ["A", "C", "G", "T"]
         current_exon -= 1 #This is performed, so that in next steps, when adding one per cycle, it returns the expected exon
 
-        for i in range (0,len(new_genomic_coordinates["start"])):
+        for i in range (0,len(new_genomic_coordinates["start"])): #Every instance of the loop will be an exon
             acceptor_list = []
             donor_list = []
 
-            if i%2 == 0:
+            if i%2 == 0: #As acceptors go first, if the index is even, it must be an acceptor
                 is_acceptor = True
                 is_donor = False
                 current_exon += 1 #Every time the program reaches an acceptor, it has advanced one exon
@@ -957,19 +965,19 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
             elif current_exon > last_five_exon and current_exon <= first_three_exon and is_acceptor is True:
             #Which translates into, if program is after 5'UTR region and before or at the first exon presenting 3'UTR and is checking an acceptor
                 instance_seq = concatenated_sequence[sequence_position : (sequence_position + 23)]
-                mes_ref = maxent.score3(instance_seq)
-                for ind in range (18,20):
+                mes_ref = maxent.score3(instance_seq) #The reference MES score is calculated
+                for ind in range (18,20): #canonical positions will be mutated
                     ref_base = instance_seq[ind]
                     for alt_base in nts:
                         if alt_base == ref_base: continue
                         mutated_seq = snp_mutator(instance_seq, ind+1, alt_base)
-                        mes_mut = maxent.score3(mutated_seq)
-                        if mes_ref != 0:
+                        mes_mut = maxent.score3(mutated_seq) #Mutated acceptor MES score is calculated
+                        if mes_ref != 0: #The percentage of variation is calculated
                             percentage_variation = f"{round(((mes_mut - mes_ref)/mes_ref)*100, 2)}%"
                         else:
                             percentage_variation = f"MES score from reference was 0, an error may have occurred"
                         acceptor_list.append(f"Pos({ind-20}){ref_base}>{alt_base} = {percentage_variation}")
-                mes_result[f"exon{current_exon}"]["Acceptor strength variation"] = acceptor_list
+                mes_result[f"exon{current_exon}"]["Acceptor strength variation"] = acceptor_list #The analysis of the acceptor is added to the results
                 sequence_position += 23
             
             elif current_exon >= last_five_exon and current_exon < first_three_exon and is_donor is True:
@@ -993,10 +1001,10 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
         if csv_output is True:
             fieldnames = ["Exon", "Site", "Variant", "Relative_strength_variation"]
             with open(f'{file_name}.csv', mode='w', newline='', encoding='utf-8-sig') as file:
-                file.write("sep=,\n")
+                file.write("sep=,\n") #This assures that decimals will be correctly formated in every language
                 writer = csv.writer(file)
                 writer.writerow(fieldnames)
-                for ex, ex_info in mes_result.items():
+                for ex, ex_info in mes_result.items(): #The data for the different columns is extracted from the result dictionary
                     for site, site_info in ex_info.items():
                         if site == "Acceptor strength variation":
                             site = "Acceptor"
