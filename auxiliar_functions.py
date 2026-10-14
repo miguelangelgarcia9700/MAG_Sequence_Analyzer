@@ -5,9 +5,25 @@ import time
 
 
 def inputing():
-    """Inputing function manages the data input through the library argparse
-Information about any of the inputs is present inside its respective parser and can be retrieved by inputing in the terminal:
-'python (module_name).py --help"""
+    """Parse and validate command-line arguments for input in main.
+
+    Defines the available command-line options and retrieves the user's
+    requested transcript, coordinates, flanking length, sequence
+    fragment, restriction enzymes, intron inclusion setting, and email.
+    
+    Only the transcript is strictly necessary for the program to work
+    the need for the rest of inputs depend on what analysis are to be done.
+
+    Returns:
+        tuple: Transcript ID, coordinate specification, flank length,
+            fragment, enzyme list, intron inclusion flag, and email,
+            in that order.
+
+    Raises:
+        ValueError: If the transcript ID, fragment, enzyme names, or
+            flanking length fails the preliminary validation.
+        SystemExit: If argparse encounters invalid command-line input.
+    """
 
     parser = argparse.ArgumentParser(description="Map cDNA coordinates to genomic sequences and analyze them.")
     parser.add_argument("-t", "--transcript", required=True, help="Ensembl Transcript ID ('ENST00000357654' or 'ENST00000357654.9' for example)")
@@ -23,13 +39,13 @@ Information about any of the inputs is present inside its respective parser and 
     transcript = args.transcript.strip()
     coordinates = args.coordinates.strip()
     flank = args.flank
-    fragment = args.fragment()
+    fragment = args.fragment
     enzymes = args.enzymes
     include_introns = args.include_introns
     mail = args.mail
     
     #Now the input passes a superficial check
-    if match := re.match(r"^(ENST[\d]+)(\.[\d])?$", transcript):
+    if match := re.match(r"^(ENST[\d]+)(\.[\d]+)?$", transcript):
         transcript = match.group(1)
     else:
         raise ValueError("Invalid Ensembl Transcript ID. Valid example = 'ENST00000357654' or 'ENST00000357654.9'")
@@ -49,7 +65,24 @@ Information about any of the inputs is present inside its respective parser and 
     return transcript, coordinates, flank, fragment, enzymes, include_introns, mail
 
 def coordinate_extractor(coordinates):
-    """This function checks if the coordinates are in a valid format through regex and separates start and end positions."""
+    """This function checks if the coordinates are in a valid format through regex and separates start and end positions.
+    Supported formats:
+        - cDNA: 'c.5172' or 'c.5172_5180'.
+        - Exonic: 'ex.18' or 'ex.18_20'.
+        - Whole transcript: 'whole'.
+
+    Parameters:
+        coordinates (str): Coordinate specification to validate.
+
+    Returns:
+        tuple[start = int | None, end = int | None, coordtype = str]:
+            Start coordinate, end coordinate, and coordinate type.
+            Start and end will only be None when inputed coordinate is 'whole'
+
+    Raises:
+        ValueError: If the format is invalid, a coordinate is below 1,
+            or the end coordinate is smaller than the start coordinate.
+    """
     
     if match:= re.search(r"^c\.(\d+)(?:_(\d+))?$", coordinates, re.IGNORECASE): #Have coordinates been inputed in a cDNA format?
         
@@ -95,8 +128,25 @@ def coordinate_extractor(coordinates):
     else: raise ValueError("Invalid coordinate format. Valid cdna coordinates examples = c.5172 or c.5172_5180, Valid exonic examples = ex.18 or ex.18_20 and for Whole transcript don't write -c at all")
 
 def ensembl_request(url, headers, max_retries=3):
-    """This is an auxiliar function that, in case that ensembl is unresponsive, will retry another 3 times before it gives up and returns an error.
-As an auxiliar function, this is NOT meant to be used independently"""
+    """Send an HTTP request to the Ensembl REST API with retries.
+
+    Retries requests after selected server errors, rate limits, and
+    connection exceptions, using exponential backoff.
+
+    Parameters:
+        url (str): Ensembl REST API endpoint.
+        headers (dict): HTTP request headers.
+        max_retries (int): Maximum number of retries after the initial
+            attempt. Defaults to 3.
+
+    Returns:
+        requests.Response: HTTP response. Non-retryable HTTP errors
+            are returned for the caller to handle.
+
+    Raises:
+        RuntimeError: If the request repeatedly fails due to connection
+            errors or retries are exhausted.
+    """
 
     for attempt in range(max_retries + 1):
         try:
@@ -133,10 +183,35 @@ As an auxiliar function, this is NOT meant to be used independently"""
     raise RuntimeError("Ensembl request failed.")
 
 def get_sequence(genomic_coords, chromosome, strand, flank = 0, include_introns = False, species = "human"): 
-    """This method uses the Ensembl REST API, as well as some of the previously acquired information the get_info() method from a SearchInfo object, to extract the sequence
-This function is used as an auxiliar function inside get_sequence() method in SearchInfo class and in mes_canonical_analysis() method in Sequence class.
-Even while being an auxiliar function, with the correct input, it can be used independently"""
+    """Retrieve a genomic sequence from Ensembl.
+
+    The requested region is determined by the supplied genomic
+    coordinates and extended by the requested flanking length.
+    Introns can either be retained or excluded from the returned
+    sequence. The strand determines the orientation of the sequence.
     
+    In this program, the get_info() method from SearchInfo class provides
+    most of this function's input
+
+    Parameters:
+        genomic_coords (dict): Dictionary with 'start' and 'end' keys,
+            each containing genomic coordinates for the selected exons.
+        chromosome (str): Chromosome or sequence-region identifier.
+        strand (int): Transcript strand; 1 for forward or -1 for reverse.
+        flank (int): Number of flanking nucleotides to include at each
+            outer end of the selected region. Defaults to 0.
+        include_introns (bool): If True, retain introns between selected
+            exons. If False, return the concatenated exon sequences.
+        species (str): Ensembl species identifier, such as 'human'.
+
+    Returns:
+        str: Retrieved DNA sequence in the requested strand orientation.
+
+    Raises:
+        ValueError: If the coordinate structure or supported parameter
+            values are invalid.
+        RuntimeError: If the Ensembl request fails.
+    """
     #The program checks that the input is correct
     if type(genomic_coords) is not dict or set(genomic_coords.keys()) != {"start", "end"}:
         raise ValueError ("genomic_coords must be a dictionary with a key being 'start' containing every exon starting coordinate and another key called 'end' containing every exon ending coordinate")
@@ -194,9 +269,24 @@ Even while being an auxiliar function, with the correct input, it can be used in
         return seq_no_introns
 
 def snp_mutator(sequence, position, new_base):
-    """Mutates a single base at a designed position within a DNA sequence. (Starting from 1)
-This function takes a sequence, a position inside it and the new desired nucleotide, and will return the mutated version of the original sequence
-In this program, this function is used as an auxiliary in interval_mutator() method in Sequence-class objects. But it can very well be used independently"""
+    """Replace one nucleotide in a DNA sequence.
+
+    Positions are 1-based, so position 1 refers to the first nucleotide.
+
+    Parameters:
+        sequence (str): Original DNA sequence.
+        position (int): Position of the nucleotide to replace, starting
+            at 1.
+        new_base (str): Replacement nucleotide: A, C, G, or T.
+
+    Returns:
+        str: Mutated DNA sequence in uppercase.
+
+    Raises:
+        ValueError: If the position is outside the sequence, the
+            replacement nucleotide is invalid, or the replacement is
+            identical to the reference nucleotide.
+    """
     
     if not (1 <= position <= len(sequence)): #If the given position is not inside the sequence, the program launches an error
         raise ValueError("Mutation position out of sequence bounds.")
@@ -214,9 +304,28 @@ In this program, this function is used as an auxiliary in interval_mutator() met
 
 
 def exon_intron_boundaries(include_flanking, flank, genomic_coordinates, strand):
-    """This function calculates the length of exons and introns inside the sequence. 
-This is being done in an accumulative way. For example, f two exons separated by an intron, all measured 50nt, this returns [50,100,150]
-This function is NOT meant to be used independently (though it technically could), but instead is currently being used in interval_mutator() method in Sequence class
+    """Calculate cumulative exon and intron boundaries within a sequence.
+
+    The returned values indicate the cumulative sequence positions at
+    which each exon or intervening intron ends. These positions can be
+    used to let the program know if it's traversing an exon or an intron.
+
+    Parameters:
+        include_flanking (bool): Whether the cumulative positions should
+            account for an included flanking region.
+        flank (int): Length of the flanking region in nucleotides.
+        genomic_coordinates (dict): Dictionary with 'start' and 'end'
+            keys containing exon genomic coordinates in transcript order.
+        strand (int): Transcript strand; 1 for forward or -1 for reverse.
+
+    Returns:
+        list[int]: Cumulative boundaries in exon, intron, exon order.
+            For example, three consecutive regions of 50 nucleotides
+            produce [50, 100, 150].
+
+    Notes:
+        This is an internal helper used by get_sequence() and other
+        sequence-processing methods like interval mutator.
     """
     exon_intron_difference = [] #This variable will contain the resulting list
     accumulative = 0 #This variable will be used to generate a list with exon and intron endings locally inside the sequence        

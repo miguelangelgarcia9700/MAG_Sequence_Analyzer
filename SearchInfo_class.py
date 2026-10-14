@@ -2,11 +2,57 @@ from auxiliar_functions import coordinate_extractor, ensembl_request, get_sequen
 
 
 class SearchInfo: 
-    """This class stores both, the cleaned input and the newly acquired information of the transcript.
-    Printing the object will return a string with all the information of the transcript and its sequence"""
+    """Retrieve and store transcript information from Ensembl.
+
+    The class stores the user's transcript and coordinate selection,
+    retrieves the corresponding genomic coordinates and transcript
+    metadata, and obtains the DNA sequence.
+
+    Attributes:
+        transcript (str): Ensembl transcript identifier.
+        coordinates (str): Requested cDNA, exonic, or whole-transcript
+            coordinate specification.
+        flank (int): Number of flanking nucleotides requested.
+        fragment (str | None): Optional DNA fragment to search for later.
+        enzymes (list[str] | None): Optional restriction enzyme names.
+        include_introns (bool): Whether introns should be retained.
+        species (str): Ensembl species identifier.
+        chromosome (str): Chromosome or sequence-region identifier.
+        genomic_coordinates (dict): Exon genomic coordinates under
+            'start' and 'end' keys.
+        strand (int): Transcript strand, either 1 or -1.
+        start_cdna (int | None): cDNA start coordinate, including UTR
+            notation where applicable.
+        end_cdna (int | str | None): cDNA end coordinate, potentially
+            using '*' notation for the 3'UTR.
+        refseq_id (str | None): Associated RefSeq transcript identifier.
+        sequence (str): Retrieved DNA sequence.
+    
+    All of this atributes can be called through self.atribute
+    """
     
     def __init__(self, transcript=None, coordinates="whole", flank=0, fragment=None, enzymes=None, include_introns=False, species="human"):
-        
+        """Initialize a transcript query and retrieve its information.
+
+    Parameters:
+        transcript (str): Ensembl transcript ID, optionally including
+            a version suffix.
+        coordinates (str): cDNA coordinates, exon coordinates, or
+            'whole' for the entire transcript. Defaults to 'whole'.
+        flank (int): Number of flanking nucleotides to include.
+        fragment (str | None): Optional DNA fragment for later analysis.
+        enzymes (list[str] | None): Optional restriction enzyme names.
+        include_introns (bool): Whether to retain introns between exons.
+        species (str): Ensembl species identifier. Defaults to 'human'.
+
+    Raises:
+        ValueError: If transcript is not provided.
+
+    Notes:
+        Initialization calls get_info() and get_sequence() to populate
+        the object's transcript metadata and DNA sequence, generating
+        the rest of the atributes.
+    """
         #All available information about the transcript is stored as atributes. Even the information acquired from this class methods
         if transcript is None:
             raise ValueError("A transcript must be inputed for a SearchInfo-class object to be created. Valid examples = 'ENST00000357654' or 'ENST00000357654.9'")
@@ -23,11 +69,36 @@ class SearchInfo:
         self.sequence = self.get_sequence()
         
     def __str__(self): #Printing the object will return a brief desccription of the transcript
-         
+        """Return a human-readable summary of the transcript and sequence.
+
+        Returns:
+            str: Summary containing the transcript ID, species, cDNA
+                coordinates, chromosome, strand, flank length, and sequence.
+        """ 
         return f"The sequence inside the transcript {self.transcript} of {self.species} species, with its cDNA coordinates being {self.start_cdna}-{self.end_cdna} in chromosome {self.chromosome}, inside the strand {self.strand} and flanking regions of {self.flank} nucleotides is {self.sequence}"
     
     def get_info(self): 
-        """This method uses the Ensembl REST API, alongside the inputed information, to retrieve valuable information from the transcript"""
+        """Retrieve transcript metadata and genomic coordinates from Ensembl.
+
+        Uses the Ensembl REST API to map cDNA coordinates or retrieve exon
+        and UTR annotations for an exonic or whole-transcript selection.
+
+        Returns:
+            tuple: Chromosome, genomic-coordinate dictionary, strand,
+                start cDNA coordinate, end cDNA coordinate, and RefSeq ID,
+                in that order.
+
+        Raises:
+            ValueError: If the coordinate specification cannot be parsed.
+            RuntimeError: If the Ensembl request fails.
+            KeyError or IndexError: If the API response lacks expected data.
+
+        Notes:
+            Genomic coordinates are stored under 'start' and 'end' keys, with
+            those having the starting and ending values for every exon inside.
+            For exon-based selections, cDNA coordinates are inferred from
+            exon lengths and UTR annotations.
+        """
         
         #===EXTRACTING COORDINATES====
         #The program uses the previously defined coordinate_extractor to check and separate the starting and ending coordinates from input.
@@ -170,9 +241,34 @@ class SearchInfo:
             return chromosome, genomic_coordinates, strand, start_cdna, end_cdna, refseq_id
     
     def get_sequence(self, genomic_coords = None, chromosome = None, strand = None, flank = None, include_introns = None, species = "human"): 
-        """This method uses the previously defined get_sequence() auxiliar function to retrieve the DNA sequence, out from the information available
-As stated before, get_sequence() auxiliar function uses a Ensembl REST API, as well as the genomic positions previously acquired, to extract the sequence"""
+        """Retrieve the DNA sequence for the selected genomic region.
 
+        Parameters:
+            genomic_coords (dict | None): Exon genomic coordinates. If None,
+                uses the genomic coordinates stored in this object as atribute.
+            chromosome (str | None): Chromosome or sequence-region identifier.
+                If None, uses the stored chromosome.
+            strand (int | None): Transcript strand, 1 or -1. If None, uses
+                the stored strand.
+            flank (int | None): Number of flanking nucleotides. If None,
+                uses the object's flank value.
+            include_introns (bool | None): Whether to retain introns. If
+                None, uses the object's setting.
+            species (str): Ensembl species identifier. Defaults to 'human';
+                the object's species is used when this default is supplied.
+            
+            (get_info() method automatically retrieves most of this parameters
+            and store them as atributes)
+            
+        Returns:
+            str: DNA sequence retrieved from Ensembl in the requested
+                strand orientation, with introns included or excluded
+                according to the selected option.
+
+        Raises:
+            ValueError: If the supplied parameters are invalid.
+            RuntimeError: If the Ensembl request fails.
+        """
         #Inputed information is checked. If retreieved from get_info() method, everything should be alright, but in case the
         #user is using this method independently, the input is checked.
         if genomic_coords is None:
