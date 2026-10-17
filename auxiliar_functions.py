@@ -32,7 +32,7 @@ def inputing():
     parser.add_argument("-s", "--fragment", default=None, help="Sequence fragment to be searched inside main sequence") 
     parser.add_argument("-e", "--enzymes", default=None, nargs="+", help="Restriction enzymes to be searched inside main sequence separated by spaces")
     parser.add_argument("-i", "--include_introns", action="store_true", help="If there are introns inside the inputed coordinates and you want to include them, write -i, else, if you only want cDNA, don't. Example: BRCA1:c.5152(end of ex 17)_5153(beggining ex 18) may include the intron inbetween")
-    parser.add_argument("-m", "--mail", default="your_email@example.com", help="NCBI API REST to access Clinvar information needs a personal email of identification. Though, leaving it as default('your_email@example.com') by not writting -m at all, for some reason, works")
+    parser.add_argument("-m", "--mail", default="your_email@example.com", help="The NCBI E-utilities API uses an email address to identify the requester. You can provide one using -m. The default value is retained for convenience and may even work, although providing your own email address is recommended.")
     args = parser.parse_args()
     
     #Before checking the info, input is stored in variables

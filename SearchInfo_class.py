@@ -96,6 +96,8 @@ class SearchInfo:
         Notes:
             Genomic coordinates are stored under 'start' and 'end' keys, with
             those having the starting and ending values for every exon inside.
+            {start:[ex.1 starting coordinate, ex.2...], end: [ex.1 ending...]}
+            
             For exon-based selections, cDNA coordinates are inferred from
             exon lengths and UTR annotations.
         """
