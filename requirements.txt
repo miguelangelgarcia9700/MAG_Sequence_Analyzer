@@ -1,3 +1,7 @@
 biopython
-maxentpy
+#To install the maxentpy library, you will need to download Microsoft C++ build tools https://visualstudio.microsoft.com/visual-cpp-build-tools/.
+#And when installed, execute and install Desktop development with C++, leaving its default options.
+#If you don´t want to do this, just delete the  maxentpy library under this paragraph and comment or delete its analysis in main(), its 
+#method in Sequence_class.py, and its funtion and library input in splicing_methods.py (This library is responsible for the MaxEntScan method)
+git+https://github.com/kepbod/maxentpy.git #This is the maxentpy library
 requests

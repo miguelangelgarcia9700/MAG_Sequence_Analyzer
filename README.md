@@ -85,14 +85,16 @@ Depending on the selected input region, the analysis can be performed on a compl
 
 The program provides several methods for characterizing a nucleotide sequence:
 
-- **DNA translation:** translates nucleotide sequences into amino acid sequences in supported reading frames.
-- **Nucleotide composition:** calculates the proportion of a specified nucleotide.
-- **GC content:** calculates the fraction of guanine and cytosine nucleotides.
-- **CpG island detection:** identifies candidate regions according to the thresholds implemented in the program.
-- **Restriction enzyme analysis:** searches for recognition sites of user-selected enzymes and/or a predefined set of enzymes.
-- **Sequence fragment search:** searches for a specified nucleotide fragment within the analyzed sequence.
+-**DNA translation:** translates nucleotide sequences into amino acid sequences in supported reading frames.
+-**Nucleotide composition:** calculates the proportion of a specified nucleotide.
+-**GC content:** calculates the fraction of guanine and cytosine nucleotides.
+-**CpG island detection:** identifies candidate regions according to the thresholds implemented in the program.
+-**Restriction enzyme analysis:** searches for recognition sites of user-selected enzymes and/or a predefined set of enzymes.
+-**Sequence fragment search:** searches for a specified nucleotide fragment within the analyzed sequence.
 
 The results can help characterize the sequence before investigating potential variant effects.
+
+It's recommended to comment in main (to deactivate) any analysis you dont wan't to perform, to avoid consuming unnecessary resources.
 
 ### 3. Systematic single-nucleotide polymorphism generation
 
@@ -200,11 +202,13 @@ source .venv/bin/activate
 
 ### 3. Install the dependencies
 
-If the repository includes a `requirements.txt` file, install its dependencies with:
+To install its dependencies, just execute:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
+**Note:** To install the maxentpy library, you will need to download Microsoft C++ build tools https://visualstudio.microsoft.com/visual-cpp-build-tools/. And when installed, execute and install Desktop development with C++, leaving its default options.
+If you don´t want to do this, just delete the  maxentpy library under this paragraph and comment or delete its analysis in main(), its method in Sequence_class.py, and its funtion and library input in splicing_methods.py (This library is responsible for the MaxEntScan method)
 
 ### 4. Verify the project files
 

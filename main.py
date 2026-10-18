@@ -71,6 +71,9 @@ def main():
 
         print("\n=== NUCLEOTIDE PROPORTION ===")
         print(f"The prooportion of Adenine inside the sequence is {seq.nucleotide_proportion('A', return_as_percentage=True)}")
+        print(f"The prooportion of Cytosine inside the sequence is {seq.nucleotide_proportion('C', return_as_percentage=True)}")
+        print(f"The prooportion of Guanine inside the sequence is {seq.nucleotide_proportion('G', return_as_percentage=True)}")
+        print(f"The prooportion of Thymine inside the sequence is {seq.nucleotide_proportion('T', return_as_percentage=True)}")
 
         print("\n=== PROTEIN TRANSLATION ===")
         for frame, aminoacid_sequence in seq.translate_dna_to_protein().items():
@@ -89,7 +92,7 @@ def main():
         print(seq.screen_enzymes())
         
         print("\n=== INPUTED FRAGMENT SEARCH INSIDE MAIN SEQUENCE ===")
-        print(seq.search_seq(fragment))
+        print(seq.search_seq(fragment=fragment))
         
         #print("\n=== ALL POSSIBLE SNPs INSIDE MAIN SEQUENCE ===")
         seq.interval_mutator(file_output=["csv", "fasta"]) 
