@@ -1,7 +1,8 @@
 # MAG Sequence Analyzer
 ### Made by: Miguel Ángel García de Castro
 ### Contact mail: miguelangelgarcia9700@gmail.com
-### Video tutorial of usage: here I'll put the link to the video
+
+If you have any doubt about the program or something is not working correctly, please, dont be afraid of contact me through the previously mentioned email
 
 # MAG_Sequence_Analyzer
 
