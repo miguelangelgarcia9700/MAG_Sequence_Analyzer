@@ -202,7 +202,7 @@ def hexplorer_splicing_analysis(self, hex_score_matrix, reference_sequence=None,
 
     return hexplorer_results
 
-def mes_canonical_analysis(self, genomic_coordinates = None, chromosome = None, strand = None, species = "human", coordinates = None, start_cdna = None, end_cdna = None, file_output=None, file_name=None, file_path="./results/mes_canonical_analysis"):
+def mes_canonical_analysis(self, genomic_coordinates = None, chromosome = None, strand = None, species = "human", coordinates = None, end_cdna = None, file_output=None, file_name=None, file_path="./results/mes_canonical_analysis"):
     """Evaluate canonical splice-site strength using MaxEntScan.
     
     The MaxEntScan score is a form of meassure for the splicing site strength
@@ -231,12 +231,10 @@ def mes_canonical_analysis(self, genomic_coordinates = None, chromosome = None, 
         coordinates (str | None): Originally inputed coordinates, such as
             'ex.18', 'ex.18_20', or 'whole'. If None, uses self.coordinates.
             Only accepts exonic coordinates or 'whole', not cDNA coordinates.
-        start_cdna (int | None): Starting cDNA coordinate, used to determine
-            whether the selected interval includes a 5' UTR. If None, uses 
-            self.start_cdna. If still None, the program assumes there is no 5'UTR
         end_cdna (int | str | None): Ending cDNA coordinate, used to determine
             whether the selected interval includes a 3' UTR. If None, uses 
             self.end_cdna. If still None, the program assumes there is no 3'UTR
+            If 3'UTR is detected, the program will asume it's the last exon
         file_output (str | None): Optional csv output format
             May be introduced as a string (file_output='csv')
         file_name (str | None): Set the name to the csv. If not set, default can be:
@@ -330,13 +328,6 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
     else:
         raise ValueError ("The only coordinate inputs supported for MES_canonical_analysis() are whole exons (-c ex.18 or -c ex.18_20) or the whole transcript (not writing -c at all)")
     
-    if start_cdna is None: #start_cdna coordinate enables the program to know the pressence or abscence of 5'UTR
-        if self.start_cdna is not None:
-            start_cdna = self.start_cdna
-        else:
-            print("[ALERT] You have not inputed a start_cdna coordinate for MES_canonical_analysis, thus the program will asume there is NO 5'UTR region in your interval")
-            start_cdna = 1 ##No 5'UTR nomenclature will not trigger the serch for the exon in which it beggins, which is the only use for start_cdna in this method. Thus 1 is selected as its generic nomenclature
-    
     if end_cdna is None: #start_cdna coordinate enables the program to know the pressence or abscence of 3'UTR 
         if self.end_cdna is not None:
             end_cdna = self.end_cdna
@@ -349,29 +340,13 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
     include_introns = False
     genomic_max_index = len(genomic_coordinates["start"]) - 1 #This variable will help the program to traverse through all the exons
     
-    if start_cdna < 0: #There must be a 5'UTR
-        accumulated_five_length = 0
-        for i in range(0, genomic_max_index + 1): 
-            accumulated_five_length += genomic_coordinates["end"][i] - genomic_coordinates["start"][i] + 1 #first exon length is accumulated
-            if accumulated_five_length < -start_cdna: #If accumulation is smaller than the size of 5'UTR, there must be more exons inside 5'UTR
-                continue
-            else:
-                last_five_exon = i + current_exon - 1 #This will be the last exon presenting 5'UTR
-    else:
-        last_five_exon = 0 #This will always be smaller than any current_exon
-            
+    ignore_first_acceptor = False
+    if current_exon == 1:
+        ignore_first_acceptor = True
+        
+    ignore_last_donor =False        
     if type(end_cdna) is str: #If end_cdna is a string, its nomenclature must be *(number) and thus, there is 3'UTR
-        if match := re.search(r"^\*(\d+)", end_cdna):
-            three_utr_length = int(match.group(1))
-            accumulated_three_length = 0
-            for i in range(0, genomic_max_index + 1):
-                accumulated_three_length += genomic_coordinates["end"][genomic_max_index-i] - genomic_coordinates["start"][genomic_max_index-i] + 1
-                if accumulated_three_length < three_utr_length:
-                    continue
-                else:
-                    first_three_exon = genomic_max_index - i + current_exon + 1 #This will be the first exon presenting 3'UTR
-    else:
-        first_three_exon = current_exon + genomic_max_index + 2 #This will always be bigger than any current_exon
+        ignore_last_donor = True
     
     #This variables will contain the starting and ending points of acceptors and donnors, distributed like [A,D,A,D...]
     new_start_list = []
@@ -411,19 +386,19 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
             is_acceptor = False
             is_donor = True
 
-        if (current_exon <= last_five_exon or current_exon > first_three_exon) and is_acceptor is True:
+        if current_exon == 1 and ignore_first_acceptor is True and is_acceptor is True:
         #Which translates into, if the program is on any exon with 5'UTR or after the first exon presenting 3'UTR and is checking an acceptor
-            acceptor_list.append("Acceptor is in UTR range")
+            acceptor_list.append("Exon 1 acceptor is not a splicing site")
             mes_result[f"exon{current_exon}"]["Acceptor strength variation"] = acceptor_list
             sequence_position += 23
         
-        elif (current_exon < last_five_exon or current_exon >= first_three_exon) and is_donor is True:
+        elif i == len(new_genomic_coordinates["start"])-1 and ignore_last_donor is True and is_donor is True:
         #Which translates into, if the program is on the last exon with 5'UTR or on any exon presenting 3'UTR and is checking a donor
-            donor_list.append("Donor is in UTR range")
+            donor_list.append("Last exon's donor is not a splicing site")
             mes_result[f"exon{current_exon}"]["Donor strength variation"] = donor_list
             sequence_position += 9
             
-        elif current_exon > last_five_exon and current_exon <= first_three_exon and is_acceptor is True:
+        elif is_acceptor is True:
         #Which translates into, if program is after 5'UTR region and before or at the first exon presenting 3'UTR and is checking an acceptor
             instance_seq = concatenated_sequence[sequence_position : (sequence_position + 23)]
             mes_ref = maxent.score3(instance_seq) #The reference MES score is calculated
@@ -441,7 +416,7 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
             mes_result[f"exon{current_exon}"]["Acceptor strength variation"] = acceptor_list #The analysis of the acceptor is added to the results
             sequence_position += 23
         
-        elif current_exon >= last_five_exon and current_exon < first_three_exon and is_donor is True:
+        elif is_donor is True:
         #Which translates into, if program is after or at the last exon presenting 5'UTR region and before 3'UTR and is checking a donor 
             instance_seq = concatenated_sequence[sequence_position : (sequence_position + 9)]
             mes_ref = maxent.score5(instance_seq)
@@ -476,9 +451,12 @@ The only coordinate inputs supported for MES_canonical_analysis() are whole exon
                     elif site == "Donor strength variation":
                         site = "Donor"
                     for variant_info in site_info:
-                        match = re.search(r"^([^=]+) = ([^=]+)$", variant_info)
-                        variant = match.group(1)
-                        strength_variation = match.group(2)
+                        if match := re.search(r"^([^=]+) = ([^=]+)$", variant_info):
+                            variant = match.group(1)
+                            strength_variation = match.group(2)
+                        else:
+                            variant = ""
+                            strength_variation = variant_info
                         writer.writerow([ex, site, variant, strength_variation])
                     
     return mes_result

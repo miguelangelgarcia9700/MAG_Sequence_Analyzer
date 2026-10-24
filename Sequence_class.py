@@ -470,7 +470,7 @@ class Sequence:
         """
         return clinvar_screener(self, mutations, refseq_id, file_output, file_name, file_path, mail)
     
-    def mes_canonical_analysis(self, genomic_coordinates = None, chromosome = None, strand = None, species = "human", coordinates = None, start_cdna = None, end_cdna = None, file_output=None, file_name=None, file_path="./results/mes_canonical_analysis"):
+    def mes_canonical_analysis(self, genomic_coordinates = None, chromosome = None, strand = None, species = "human", coordinates = None, end_cdna = None, file_output=None, file_name=None, file_path="./results/mes_canonical_analysis"):
         """Evaluate canonical splice-site strength using MaxEntScan.
         
         The MaxEntScan score is a form of meassure for the splicing site strength
@@ -499,12 +499,10 @@ class Sequence:
             coordinates (str | None): Originally inputed coordinates, such as
                 'ex.18', 'ex.18_20', or 'whole'. If None, uses self.coordinates.
                 Only accepts exonic coordinates or 'whole', not cDNA coordinates.
-            start_cdna (int | None): Starting cDNA coordinate, used to determine
-                whether the selected interval includes a 5' UTR. If None, uses 
-                self.start_cdna. If still None, the program assumes there is no 5'UTR
             end_cdna (int | str | None): Ending cDNA coordinate, used to determine
                 whether the selected interval includes a 3' UTR. If None, uses 
                 self.end_cdna. If still None, the program assumes there is no 3'UTR
+                If 3'UTR is detected, the program will asume it's the last exon
             file_output (str | None): Optional csv output format
                 May be introduced as a string (file_output='csv')
             file_name (str | None): Set the name to the csv. If not set, default can be:
@@ -536,4 +534,4 @@ class Sequence:
             The method returns the results dictionary even when CSV output
             is requested.
         """
-        return mes_canonical_analysis(self, genomic_coordinates, chromosome, strand, species, coordinates, start_cdna, end_cdna, file_output, file_name, file_path)
+        return mes_canonical_analysis(self, genomic_coordinates, chromosome, strand, species, coordinates, end_cdna, file_output, file_name, file_path)
